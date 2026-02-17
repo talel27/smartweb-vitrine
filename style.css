@@ -1,108 +1,201 @@
+/* ===== RESET ===== */
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    font-family: 'Poppins', sans-serif;
 }
 
 body {
+    font-family: 'Poppins', sans-serif;
     line-height: 1.6;
+    background: #f9f9f9;
     color: #333;
 }
 
-.hero {
-    height: 100vh;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-    color: white;
-}
-
+/* ===== NAVBAR ===== */
 .navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 60px;
+    padding: 20px 8%;
+    background: rgba(0,0,0,0.8);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.logo {
+    color: #fff;
+    font-weight: 700;
+    font-size: 24px;
 }
 
 .navbar ul {
-    display: flex;
     list-style: none;
+    display: flex;
 }
 
 .navbar ul li {
     margin-left: 25px;
 }
 
-.navbar a {
-    color: white;
+.navbar ul li a {
     text-decoration: none;
+    color: #fff;
     font-weight: 500;
+    transition: 0.3s;
 }
 
-.hero-content {
+.navbar ul li a:hover {
+    color: #00c6ff;
+}
+
+/* ===== HERO ===== */
+.hero {
+    height: 90vh;
+    background: linear-gradient(135deg, #0072ff, #00c6ff);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     text-align: center;
-    margin-top: 15%;
-    padding: 0 20px;
-}
-
-.hero-content h2 {
-    font-size: 3rem;
-}
-
-.hero-content p {
-    margin: 20px 0;
-    font-size: 1.1rem;
-}
-
-.btn {
-    display: inline-block;
-    padding: 12px 30px;
-    background: #00c6ff;
     color: white;
+    padding: 20px;
+}
+
+.hero h2 {
+    font-size: 42px;
+    margin-bottom: 20px;
+    animation: fadeDown 1s ease;
+}
+
+.hero p {
+    font-size: 18px;
+    margin-bottom: 30px;
+    animation: fadeUp 1.2s ease;
+}
+
+/* ===== BUTTON ===== */
+.btn {
+    background: white;
+    color: #0072ff;
+    padding: 12px 30px;
     border-radius: 30px;
     text-decoration: none;
+    font-weight: 600;
     transition: 0.3s;
 }
 
 .btn:hover {
-    background: #0072ff;
+    background: #333;
+    color: white;
 }
 
+/* ===== SECTIONS ===== */
 .section {
-    padding: 80px 60px;
+    padding: 80px 10%;
     text-align: center;
 }
 
-.gray {
-    background: #f4f4f4;
+.section h2 {
+    margin-bottom: 40px;
+    font-size: 32px;
+    position: relative;
 }
 
+.gray {
+    background: #f1f5f9;
+}
+
+/* ===== CARDS ===== */
 .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 20px;
-    margin-top: 40px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 30px;
 }
 
 .card {
     background: white;
     padding: 30px;
     border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    width: 280px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    transition: 0.4s;
 }
 
-.tech-list {
-    list-style: none;
-    margin-top: 30px;
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.2);
 }
 
-.tech-list li {
-    font-size: 1.2rem;
-    margin: 10px 0;
+/* ===== FORM ===== */
+.contact-form {
+    max-width: 500px;
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
+.contact-form input,
+.contact-form textarea {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    font-family: inherit;
+}
+
+.contact-form textarea {
+    min-height: 120px;
+    resize: none;
+}
+
+.contact-form button {
+    cursor: pointer;
+    border: none;
+}
+
+/* ===== FOOTER ===== */
 footer {
     background: #111;
     color: white;
     text-align: center;
     padding: 20px;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+    }
+
+    .navbar ul {
+        flex-direction: column;
+        margin-top: 15px;
+    }
+
+    .navbar ul li {
+        margin: 10px 0;
+    }
+
+    .cards {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .hero h2 {
+        font-size: 28px;
+    }
 }
