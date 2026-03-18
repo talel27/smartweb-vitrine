@@ -1,0 +1,9 @@
+{
+  "name": "smartweb-api",
+  "version": "1.0.0",
+  "description": "API pour modifier le site",
+  "main": "update-site.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
