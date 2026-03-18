@@ -27,8 +27,11 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Modification invalide' });
     }
 
-    const githubToken =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; // À ajouter dans les variables Vercel
-    const repo = 'talel27/smartweb-vitrine';
+const githubToken = process.env.GITHUB_TOKEN;
+if (!githubToken) {
+  console.error('❌ GITHUB_TOKEN manquant');
+  return res.status(500).json({ error: 'Token GitHub manquant' });
+}    const repo = 'talel27/smartweb-vitrine';
     const branch = 'main';
     const filePath = 'index.html';
 
