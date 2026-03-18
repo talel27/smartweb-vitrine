@@ -1,9 +1,8 @@
 export default async function handler(req, res) {
   const token = req.headers.authorization?.split(' ')[1];
   
-  if (token !== process.env.DASHBOARD_API_TOKEN) {
+  if (token !== 'smartweb-2025-secret-token-123') {
     return res.status(401).json({ error: 'Non autorisé' });
-  }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
