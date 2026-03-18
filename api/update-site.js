@@ -1,4 +1,6 @@
 const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = async (req, res) => {
   // Configuration CORS
@@ -37,10 +39,13 @@ module.exports = async (req, res) => {
 
     const repo = 'talel27/smartweb-vitrine';
     const branch = 'main';
-    const filePath = 'index.html';
+    
+    // ===== NOUVEAU : Utiliser le fichier spécifié dans la modification =====
+    const filePath = modification.page || 'index.html';
+    console.log(`📁 Modification du fichier: ${filePath}`);
 
     // ===== RÉCUPÉRER LE FICHIER =====
-    console.log('🔍 Récupération du fichier depuis GitHub...');
+    console.log(`🔍 Récupération de ${filePath} depuis GitHub...`);
     const getFileResponse = await fetch(
       `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`,
       {
@@ -53,7 +58,7 @@ module.exports = async (req, res) => {
 
     if (!getFileResponse.ok) {
       const errorData = await getFileResponse.json();
-      throw new Error(`GitHub API error: ${errorData.message}`);
+      throw new Error(`GitHub API error: ${errorData.message || getFileResponse.status}`);
     }
 
     const fileData = await getFileResponse.json();
@@ -103,7 +108,6 @@ module.exports = async (req, res) => {
             `<h1>${modification.content}</h1>`
           );
         } else {
-          // Ajouter un H1 après le body
           newContent = newContent.replace(
             '<body>',
             `<body>\n    <h1>${modification.content}</h1>`
@@ -113,23 +117,20 @@ module.exports = async (req, res) => {
         break;
 
       case 'add_alt':
-        // 🖼️ Ajouter ALT à une image spécifique
-        const imgSelector = modification.selector || 'img';
-        const altRegex = new RegExp(`<${imgSelector}[^>]*>`, 'g');
+        // 🖼️ Ajouter ALT à toutes les images sans alt
+        const imgRegex = /<img (?!.*alt=)[^>]*>/g;
         let matchCount = 0;
         
-        newContent = newContent.replace(altRegex, (match) => {
-          if (!match.includes('alt=')) {
-            matchCount++;
-            return match.replace('<img', `<img alt="${modification.content}"`);
-          }
-          return match;
+        newContent = newContent.replace(imgRegex, (match) => {
+          matchCount++;
+          return match.replace('<img', `<img alt="${modification.content}"`);
         });
 
         if (matchCount === 0) {
-          throw new Error('Aucune image sans alt trouvée');
+          console.log('⚠️ Aucune image sans alt trouvée');
+        } else {
+          console.log(`✅ ALT ajouté à ${matchCount} image(s)`);
         }
-        console.log(`✅ ALT ajouté à ${matchCount} image(s)`);
         break;
 
       case 'add_schema':
@@ -138,14 +139,12 @@ module.exports = async (req, res) => {
         const schemaContent = modification.content;
         
         if (newContent.includes(schemaTag)) {
-          // Remplacer le schema existant
           const schemaRegex = /<script type="application\/ld\+json">.*?<\/script>/s;
           newContent = newContent.replace(
             schemaRegex,
             `<script type="application/ld+json">${schemaContent}</script>`
           );
         } else {
-          // Ajouter avant la fermeture de </body>
           newContent = newContent.replace(
             '</body>',
             `  <script type="application/ld+json">${schemaContent}</script>\n</body>`
@@ -193,7 +192,7 @@ module.exports = async (req, res) => {
           'Accept': 'application/vnd.github.v3+json'
         },
         body: JSON.stringify({
-          message: `🤖 ${modification.type} - ${new Date().toISOString()}`,
+          message: `🤖 ${modification.type} - ${filePath} - ${new Date().toISOString()}`,
           content: newContentBase64,
           sha: fileData.sha,
           branch: branch
@@ -210,8 +209,9 @@ module.exports = async (req, res) => {
 
     res.json({
       success: true,
-      message: `✅ ${modification.type} appliqué avec succès ! Déploiement en cours...`,
+      message: `✅ ${modification.type} appliqué à ${filePath} ! Déploiement en cours...`,
       modification: modification,
+      file: filePath,
       commit_url: updateResult.commit?.html_url
     });
 
