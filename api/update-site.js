@@ -27,7 +27,6 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Modification invalide' });
     }
 
-    // 🔥 Récupérer le fichier actuel depuis GitHub
     const githubToken = process.env.GITHUB_TOKEN; // À ajouter dans les variables Vercel
     const repo = 'ton-compte/smartweb-vitrine';
     const branch = 'main';
