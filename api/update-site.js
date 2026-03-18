@@ -1,6 +1,4 @@
 const fetch = require('node-fetch');
-const fs = require('fs');
-const path = require('path');
 
 module.exports = async (req, res) => {
   // Configuration CORS
@@ -9,7 +7,6 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
 
-  // Gestion OPTIONS
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -30,41 +27,85 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Modification invalide' });
     }
 
-    // 🔥 VRAIE MODIFICATION DU FICHIER
-    const filePath = path.join(process.cwd(), 'index.html');
-    let content = fs.readFileSync(filePath, 'utf8');
+    // 🔥 Récupérer le fichier actuel depuis GitHub
+    const githubToken = process.env.GITHUB_TOKEN; // À ajouter dans les variables Vercel
+    const repo = 'ton-compte/smartweb-vitrine';
+    const branch = 'main';
+    const filePath = 'index.html';
+
+    // 1. Récupérer le fichier actuel et son SHA
+    const getFileResponse = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`,
+      {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      }
+    );
+
+    const fileData = await getFileResponse.json();
+    const currentContent = Buffer.from(fileData.content, 'base64').toString('utf8');
+    const sha = fileData.sha;
+
+    // 2. Modifier le contenu
+    let newContent = currentContent;
     
     if (modification.type === 'add_meta') {
-      // Vérifier si la meta existe déjà
       const metaRegex = /<meta name="description" content="[^"]*"/;
-      if (metaRegex.test(content)) {
-        // Remplacer la meta existante
-        content = content.replace(
+      if (metaRegex.test(newContent)) {
+        newContent = newContent.replace(
           metaRegex,
           `<meta name="description" content="${modification.content}"`
         );
       } else {
-        // Ajouter la meta dans le head
-        content = content.replace(
+        newContent = newContent.replace(
           '</head>',
           `  <meta name="description" content="${modification.content}">\n</head>`
         );
       }
     }
-    
-    // Sauvegarder le fichier
-    fs.writeFileSync(filePath, content);
-    console.log('✅ Fichier modifié avec succès !');
 
-    return res.status(200).json({ 
-      success: true, 
-      message: '✅ Site réellement modifié !',
+    // 3. Encoder en base64
+    const newContentBase64 = Buffer.from(newContent).toString('base64');
+
+    // 4. Pousser la modification sur GitHub
+    const updateResponse = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${filePath}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/vnd.github.v3+json'
+        },
+        body: JSON.stringify({
+          message: `🤖 Modification auto: ${modification.type}`,
+          content: newContentBase64,
+          sha: sha,
+          branch: branch
+        })
+      }
+    );
+
+    const updateResult = await updateResponse.json();
+
+    if (!updateResponse.ok) {
+      throw new Error(updateResult.message || 'Erreur GitHub');
+    }
+
+    // 5. Déclencher un déploiement Vercel (optionnel car GitHub push déclenche auto)
+    console.log('✅ Modification poussée sur GitHub');
+
+    res.json({
+      success: true,
+      message: '✅ Site modifié via GitHub ! Le déploiement est en cours...',
       modification: modification
     });
 
   } catch (error) {
     console.error('❌ Erreur:', error);
-    return res.status(500).json({ 
+    res.status(500).json({ 
       error: 'Erreur interne', 
       details: error.message 
     });
