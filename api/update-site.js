@@ -1,6 +1,4 @@
 const fetch = require('node-fetch');
-const fs = require('fs');
-const path = require('path');
 
 module.exports = async (req, res) => {
   // Configuration CORS
@@ -38,16 +36,94 @@ module.exports = async (req, res) => {
     }
 
     const repo = 'talel27/smartweb-vitrine';
-    const branch = 'main';
-    
-    // ===== NOUVEAU : Utiliser le fichier spécifié dans la modification =====
+    const mainBranch = 'main';
+    const featureBranch = modification.branch || 'feature/chatbot-modifications';
     const filePath = modification.page || 'index.html';
-    console.log(`📁 Modification du fichier: ${filePath}`);
 
-    // ===== RÉCUPÉRER LE FICHIER =====
-    console.log(`🔍 Récupération de ${filePath} depuis GitHub...`);
+    console.log(`📁 Branche cible: ${featureBranch}`);
+    console.log(`📁 Fichier: ${filePath}`);
+
+    // ===== 1. VÉRIFIER SI LA BRANCHE FEATURE EXISTE =====
+    console.log(`🔍 Vérification de l'existence de la branche ${featureBranch}...`);
+    
+    let branchExists = false;
+    let branchSha = null;
+    
+    try {
+      const branchesResponse = await fetch(
+        `https://api.github.com/repos/${repo}/branches/${featureBranch}`,
+        {
+          headers: {
+            'Authorization': `token ${githubToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        }
+      );
+      branchExists = branchesResponse.ok;
+      
+      if (branchExists) {
+        const branchData = await branchesResponse.json();
+        branchSha = branchData.commit.sha;
+        console.log(`✅ Branche ${featureBranch} existe déjà (SHA: ${branchSha.substring(0, 7)})`);
+      }
+    } catch (error) {
+      console.log('Erreur vérification branche:', error.message);
+    }
+
+    // ===== 2. CRÉER LA BRANCHE SI ELLE N'EXISTE PAS =====
+    if (!branchExists) {
+      console.log(`📁 Création de la branche ${featureBranch} à partir de ${mainBranch}...`);
+      
+      // Récupérer le SHA du dernier commit de main
+      const mainRefResponse = await fetch(
+        `https://api.github.com/repos/${repo}/git/refs/heads/${mainBranch}`,
+        {
+          headers: {
+            'Authorization': `token ${githubToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        }
+      );
+      
+      if (!mainRefResponse.ok) {
+        throw new Error(`Impossible de récupérer la branche ${mainBranch}`);
+      }
+      
+      const mainRef = await mainRefResponse.json();
+      const mainSha = mainRef.object.sha;
+      console.log(`📌 Dernier commit de main: ${mainSha.substring(0, 7)}`);
+      
+      // Créer la nouvelle branche
+      const createBranchResponse = await fetch(
+        `https://api.github.com/repos/${repo}/git/refs`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `token ${githubToken}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/vnd.github.v3+json'
+          },
+          body: JSON.stringify({
+            ref: `refs/heads/${featureBranch}`,
+            sha: mainSha
+          })
+        }
+      );
+      
+      if (!createBranchResponse.ok) {
+        const errorData = await createBranchResponse.json();
+        throw new Error(`Erreur création branche: ${errorData.message}`);
+      }
+      
+      console.log(`✅ Branche ${featureBranch} créée avec succès`);
+      branchSha = mainSha;
+    }
+
+    // ===== 3. RÉCUPÉRER LE FICHIER DEPUIS LA BRANCHE FEATURE =====
+    console.log(`🔍 Récupération de ${filePath} depuis la branche ${featureBranch}...`);
+    
     const getFileResponse = await fetch(
-      `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${branch}`,
+      `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${featureBranch}`,
       {
         headers: {
           'Authorization': `token ${githubToken}`,
@@ -56,20 +132,45 @@ module.exports = async (req, res) => {
       }
     );
 
-    if (!getFileResponse.ok) {
-      const errorData = await getFileResponse.json();
-      throw new Error(`GitHub API error: ${errorData.message || getFileResponse.status}`);
+    let currentContent, sha;
+    
+    if (getFileResponse.status === 404) {
+      // Le fichier n'existe pas sur la branche feature, on le prend de main
+      console.log(`📄 ${filePath} n'existe pas sur ${featureBranch}, récupération depuis ${mainBranch}...`);
+      
+      const mainFileResponse = await fetch(
+        `https://api.github.com/repos/${repo}/contents/${filePath}?ref=${mainBranch}`,
+        {
+          headers: {
+            'Authorization': `token ${githubToken}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        }
+      );
+      
+      if (!mainFileResponse.ok) {
+        throw new Error(`Fichier ${filePath} introuvable sur ${mainBranch}`);
+      }
+      
+      const fileData = await mainFileResponse.json();
+      currentContent = Buffer.from(fileData.content, 'base64').toString('utf8');
+      sha = fileData.sha;
+      console.log(`✅ Fichier récupéré depuis ${mainBranch}`);
+    } else if (getFileResponse.ok) {
+      const fileData = await getFileResponse.json();
+      currentContent = Buffer.from(fileData.content, 'base64').toString('utf8');
+      sha = fileData.sha;
+      console.log(`✅ Fichier récupéré depuis ${featureBranch}`);
+    } else {
+      throw new Error(`Erreur récupération fichier: ${getFileResponse.status}`);
     }
 
-    const fileData = await getFileResponse.json();
-    let currentContent = Buffer.from(fileData.content, 'base64').toString('utf8');
+    // ===== 4. APPLIQUER LA MODIFICATION =====
+    console.log('✏️ Application de la modification...');
     let newContent = currentContent;
-
-    // ===== APPLIQUER LES DIFFÉRENTS TYPES DE MODIFICATIONS =====
+    
     switch(modification.type) {
-      
       case 'add_meta':
-        // ✅ Ajouter/Modifier la meta description
         const metaRegex = /<meta name="description" content="[^"]*"/;
         if (metaRegex.test(newContent)) {
           newContent = newContent.replace(
@@ -86,7 +187,6 @@ module.exports = async (req, res) => {
         break;
 
       case 'update_title':
-        // 🔤 Modifier le titre de la page
         const titleRegex = /<title>.*?<\/title>/;
         if (titleRegex.test(newContent)) {
           newContent = newContent.replace(
@@ -100,7 +200,6 @@ module.exports = async (req, res) => {
         break;
 
       case 'add_h1':
-        // 📑 Ajouter ou modifier H1
         const h1Regex = /<h1>.*?<\/h1>/;
         if (h1Regex.test(newContent)) {
           newContent = newContent.replace(
@@ -117,28 +216,18 @@ module.exports = async (req, res) => {
         break;
 
       case 'add_alt':
-        // 🖼️ Ajouter ALT à toutes les images sans alt
         const imgRegex = /<img (?!.*alt=)[^>]*>/g;
         let matchCount = 0;
-        
         newContent = newContent.replace(imgRegex, (match) => {
           matchCount++;
           return match.replace('<img', `<img alt="${modification.content}"`);
         });
-
-        if (matchCount === 0) {
-          console.log('⚠️ Aucune image sans alt trouvée');
-        } else {
-          console.log(`✅ ALT ajouté à ${matchCount} image(s)`);
-        }
+        console.log(`✅ ALT ajouté à ${matchCount} image(s)`);
         break;
 
       case 'add_schema':
-        // 🔍 Ajouter des données structurées
-        const schemaTag = '<script type="application/ld+json">';
         const schemaContent = modification.content;
-        
-        if (newContent.includes(schemaTag)) {
+        if (newContent.includes('<script type="application/ld+json">')) {
           const schemaRegex = /<script type="application\/ld\+json">.*?<\/script>/s;
           newContent = newContent.replace(
             schemaRegex,
@@ -154,7 +243,6 @@ module.exports = async (req, res) => {
         break;
 
       case 'add_lang':
-        // 🌐 Ajouter l'attribut lang
         if (!newContent.includes('<html lang="')) {
           newContent = newContent.replace(
             '<html',
@@ -165,7 +253,6 @@ module.exports = async (req, res) => {
         break;
 
       case 'add_viewport':
-        // 📱 Ajouter la balise viewport
         if (!newContent.includes('name="viewport"')) {
           newContent = newContent.replace(
             '</head>',
@@ -179,7 +266,8 @@ module.exports = async (req, res) => {
         throw new Error(`Type de modification non supporté: ${modification.type}`);
     }
 
-    // ===== ENCODER ET POUSSER =====
+    // ===== 5. ENCODER ET POUSSER SUR LA BRANCHE FEATURE =====
+    console.log(`📤 Push des modifications sur la branche ${featureBranch}...`);
     const newContentBase64 = Buffer.from(newContent).toString('base64');
 
     const updateResponse = await fetch(
@@ -194,8 +282,8 @@ module.exports = async (req, res) => {
         body: JSON.stringify({
           message: `🤖 ${modification.type} - ${filePath} - ${new Date().toISOString()}`,
           content: newContentBase64,
-          sha: fileData.sha,
-          branch: branch
+          sha: sha,
+          branch: featureBranch
         })
       }
     );
@@ -206,13 +294,19 @@ module.exports = async (req, res) => {
     }
 
     const updateResult = await updateResponse.json();
+    console.log(`✅ Modification poussée sur ${featureBranch}`);
 
+    // ===== 6. URL DE LA PULL REQUEST =====
+    const prUrl = `https://github.com/${repo}/compare/${mainBranch}...${featureBranch}?expand=1`;
+    
     res.json({
       success: true,
-      message: `✅ ${modification.type} appliqué à ${filePath} ! Déploiement en cours...`,
+      message: `✅ Modification appliquée sur la branche **${featureBranch}** !\n\n🔗 Créez une Pull Request: ${prUrl}`,
       modification: modification,
       file: filePath,
-      commit_url: updateResult.commit?.html_url
+      branch: featureBranch,
+      commit_url: updateResult.commit?.html_url,
+      pr_url: prUrl
     });
 
   } catch (error) {
