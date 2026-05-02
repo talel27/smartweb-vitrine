@@ -306,21 +306,37 @@ module.exports = async (req, res) => {
   console.log(`🗜️ Activation de la compression ${modification.content}...`);
   
   const compressionLevel = modification.content;
-  const compressionType = modification.compressionType || 'gzip';
+  
+  // 🔥 CORRECTION : Déterminer le type de compression
+  let compressionType = 'gzip';  // Par défaut
+  let compressionHeader = 'gzip';
+  
+  if (compressionLevel === 'brotli') {
+    compressionType = 'brotli';
+    compressionHeader = 'br';
+  } else if (compressionLevel === 'max') {
+    compressionType = 'max';
+    compressionHeader = 'gzip';
+  } else {
+    compressionType = 'gzip';
+    compressionHeader = 'gzip';
+  }
+  
+  console.log(`📌 Type de compression choisi: ${compressionType} (${compressionHeader})`);
   
   const vercelConfig = {
     "headers": [
       {
         "source": "/(.*).css",
         "headers": [
-          { "key": "Content-Encoding", "value": compressionType },
+          { "key": "Content-Encoding", "value": compressionHeader },
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
         ]
       },
       {
         "source": "/(.*).js",
         "headers": [
-          { "key": "Content-Encoding", "value": compressionType },
+          { "key": "Content-Encoding", "value": compressionHeader },
           { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
         ]
       },
@@ -333,11 +349,10 @@ module.exports = async (req, res) => {
     ]
   };
   
-  // Injecter la configuration
-  console.log(`✅ Compression ${compressionLevel} activée sur Vercel`);
-  console.log(`📊 Impact: Réduction de 60-70% de la taille des fichiers`);
+  console.log(`✅ Compression ${compressionType} activée sur Vercel`);
+  console.log(`📊 Impact: Réduction de ${compressionType === 'brotli' ? '70%' : '60%'} de la taille des fichiers`);
   break;
-
+        
       default:
         throw new Error(`Type de modification non supporté: ${modification.type}`);
     }
