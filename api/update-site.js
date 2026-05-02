@@ -74,7 +74,6 @@ module.exports = async (req, res) => {
     if (!branchExists) {
       console.log(`📁 Création de la branche ${featureBranch} à partir de ${mainBranch}...`);
       
-      // Récupérer le SHA du dernier commit de main
       const mainRefResponse = await fetch(
         `https://api.github.com/repos/${repo}/git/refs/heads/${mainBranch}`,
         {
@@ -93,7 +92,6 @@ module.exports = async (req, res) => {
       const mainSha = mainRef.object.sha;
       console.log(`📌 Dernier commit de main: ${mainSha.substring(0, 7)}`);
       
-      // Créer la nouvelle branche
       const createBranchResponse = await fetch(
         `https://api.github.com/repos/${repo}/git/refs`,
         {
@@ -135,7 +133,6 @@ module.exports = async (req, res) => {
     let currentContent, sha;
     
     if (getFileResponse.status === 404) {
-      // Le fichier n'existe pas sur la branche feature, on le prend de main
       console.log(`📄 ${filePath} n'existe pas sur ${featureBranch}, récupération depuis ${mainBranch}...`);
       
       const mainFileResponse = await fetch(
@@ -170,6 +167,8 @@ module.exports = async (req, res) => {
     let newContent = currentContent;
     
     switch(modification.type) {
+      
+      // ==== SEO DE BASE ====
       case 'add_meta':
         const metaRegex = /<meta name="description" content="[^"]*"/;
         if (metaRegex.test(newContent)) {
@@ -215,6 +214,22 @@ module.exports = async (req, res) => {
         console.log('✅ H1 modifié/ajouté');
         break;
 
+      case 'add_h2':
+        const h2Regex = /<h2>.*?<\/h2>/;
+        if (h2Regex.test(newContent)) {
+          newContent = newContent.replace(
+            h2Regex,
+            `<h2>${modification.content}</h2>`
+          );
+        } else {
+          newContent = newContent.replace(
+            '</body>',
+            `    <h2>${modification.content}</h2>\n</body>`
+          );
+        }
+        console.log('✅ H2 ajouté/modifié');
+        break;
+
       case 'add_alt':
         const imgRegex = /<img (?!.*alt=)[^>]*>/g;
         let matchCount = 0;
@@ -223,6 +238,23 @@ module.exports = async (req, res) => {
           return match.replace('<img', `<img alt="${modification.content}"`);
         });
         console.log(`✅ ALT ajouté à ${matchCount} image(s)`);
+        break;
+
+      case 'add_internal_links':
+        const linksHtml = modification.content;
+        newContent = newContent.replace(
+          '</body>',
+          `    <div class="internal-links">${linksHtml}</div>\n</body>`
+        );
+        console.log('✅ Liens internes ajoutés');
+        break;
+
+      case 'add_canonical':
+        const canonicalTag = `<link rel="canonical" href="${modification.content}">`;
+        if (!newContent.includes('canonical')) {
+          newContent = newContent.replace('</head>', `    ${canonicalTag}\n</head>`);
+        }
+        console.log('✅ Balise canonical ajoutée');
         break;
 
       case 'add_schema':
@@ -260,6 +292,129 @@ module.exports = async (req, res) => {
           );
           console.log('✅ Viewport ajouté');
         }
+        break;
+
+      // ==== PERFORMANCE ====
+      case 'add_lazy_loading':
+        newContent = newContent.replace(/<img /g, '<img loading="lazy" ');
+        console.log('✅ Lazy loading ajouté');
+        break;
+
+      // ==== ANALYTICS ====
+      case 'add_ga':
+        const gaCode = `
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=${modification.content}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '${modification.content}');
+    </script>
+    `;
+        newContent = newContent.replace('</head>', `    ${gaCode}\n</head>`);
+        console.log('✅ Google Analytics ajouté');
+        break;
+
+      case 'add_gtm':
+        const gtmCode = `
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','${modification.content}');</script>
+    `;
+        newContent = newContent.replace('</head>', `    ${gtmCode}\n</head>`);
+        console.log('✅ Google Tag Manager ajouté');
+        break;
+
+      // ==== DESIGN ====
+      case 'add_color':
+        if (newContent.includes('<style>')) {
+          newContent = newContent.replace('</style>', `    ${modification.content}\n</style>`);
+        } else {
+          newContent = newContent.replace('</head>', `    <style>${modification.content}</style>\n</head>`);
+        }
+        console.log('✅ CSS couleur ajouté');
+        break;
+
+      case 'add_font':
+        if (newContent.includes('<style>')) {
+          newContent = newContent.replace('</style>', `    ${modification.content}\n</style>`);
+        } else {
+          newContent = newContent.replace('</head>', `    <style>${modification.content}</style>\n</head>`);
+        }
+        console.log('✅ Police modifiée');
+        break;
+
+      case 'add_responsive':
+        const responsiveCSS = `
+    <style>
+    /* Responsive */
+    @media (max-width: 768px) {
+      body { padding: 10px; }
+      .container { width: 100%; }
+    }
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .container { width: 90%; }
+    }
+    </style>
+    `;
+        newContent = newContent.replace('</head>', `    ${responsiveCSS}\n</head>`);
+        console.log('✅ CSS responsive ajouté');
+        break;
+
+      // ==== AUTRES ====
+      case 'add_favicon':
+        const faviconTag = `<link rel="icon" type="image/x-icon" href="${modification.content}">`;
+        if (!newContent.includes('favicon')) {
+          newContent = newContent.replace('</head>', `    ${faviconTag}\n</head>`);
+        }
+        console.log('✅ Favicon ajouté');
+        break;
+
+      case 'add_security':
+        const securityTags = `
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+    `;
+        newContent = newContent.replace('</head>', `    ${securityTags}\n</head>`);
+        console.log('✅ Balises sécurité ajoutées');
+        break;
+
+      case 'add_social':
+        try {
+          const socialData = JSON.parse(modification.content);
+          const socialHtml = `
+    <div class="social-links">
+      ${Object.entries(socialData).map(([network, url]) => 
+        `<a href="${url}" target="_blank" rel="noopener" class="social-link">${network}</a>`
+      ).join('\n      ')}
+    </div>
+    `;
+          newContent = newContent.replace('</body>', `    ${socialHtml}\n</body>`);
+          console.log('✅ Réseaux sociaux ajoutés');
+        } catch (e) {
+          console.log('⚠️ Erreur parsing JSON réseaux sociaux');
+        }
+        break;
+
+      case 'add_contact_form':
+        const contactForm = `
+    <div class="contact-form">
+      <h3>Contactez-nous</h3>
+      <form action="#" method="POST">
+        <input type="text" name="name" placeholder="Votre nom" required>
+        <input type="email" name="email" placeholder="Votre email" required>
+        <textarea name="message" placeholder="Votre message" required></textarea>
+        <button type="submit">Envoyer</button>
+      </form>
+    </div>
+    `;
+        newContent = newContent.replace('</body>', `    ${contactForm}\n</body>`);
+        console.log('✅ Formulaire contact ajouté');
         break;
 
       default:
@@ -301,7 +456,7 @@ module.exports = async (req, res) => {
     
     res.json({
       success: true,
-      message: `✅ Modification appliquée sur la branche **${featureBranch}** !\n\n🔗 Créez une Pull Request: ${prUrl}`,
+      message: `✅ ${modification.type} appliqué sur **${featureBranch}** !\n\n🔗 Pull Request: ${prUrl}`,
       modification: modification,
       file: filePath,
       branch: featureBranch,
