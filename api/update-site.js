@@ -303,37 +303,16 @@ module.exports = async (req, res) => {
 
       // ===== MINIFICATION CSS =====
       case 'minify_css':
-        console.log('🎨 Minification CSS appliquée');
-        const cssStyleRegex = /<style>([\s\S]*?)<\/style>/;
-        if (cssStyleRegex.test(newContent)) {
-          newContent = newContent.replace(
-            cssStyleRegex,
-            `<style>${modification.content}</style>`
-          );
-        } else {
-          const linkRegex = /<link rel="stylesheet" href="[^"]*\.css">/;
-          if (linkRegex.test(newContent)) {
-            newContent = newContent.replace(
-              linkRegex,
-              `<style>${modification.content}</style>`
-            );
-          }
-        }
-        console.log('✅ CSS minifié appliqué');
-        break;
+  console.log('🎨 Minification CSS - Remplacement du fichier entier');
+  newContent = modification.content;
+  console.log('✅ CSS minifié et sauvegardé (fichier entier remplacé)');
+  break;
 
-      // ===== MINIFICATION JS =====
-      case 'minify_js':
-        console.log('📜 Minification JS appliquée');
-        const jsScriptRegex = /<script>([\s\S]*?)<\/script>/;
-        if (jsScriptRegex.test(newContent)) {
-          newContent = newContent.replace(
-            jsScriptRegex,
-            `<script>${modification.content}</script>`
-          );
-        }
-        console.log('✅ JS minifié appliqué');
-        break;
+case 'minify_js':
+  console.log('📜 Minification JS - Remplacement du fichier entier');
+  newContent = modification.content;
+  console.log('✅ JS minifié et sauvegardé');
+  break;
         
       default:
         throw new Error(`Type de modification non supporté: ${modification.type}`);
