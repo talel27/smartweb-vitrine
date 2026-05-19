@@ -302,48 +302,41 @@ module.exports = async (req, res) => {
         console.log('✅ Lazy loading ajouté');
         break;
 
-      case 'add_compression':
-  console.log(`🗜️ Activation de la compression ${modification.content}...`);
-  
-  const userChoice = modification.content;  // "gzip" ou "brotli"
-  
-  // 🔥 NE PAS FORCER, RESPECTER LE CHOIX
-  let compressionHeader = 'gzip';
-  let compressionName = 'GZIP';
-  
-  if (userChoice === 'brotli') {
-    compressionHeader = 'br';
-    compressionName = 'Brotli';
-  } else if (userChoice === 'gzip') {
-    compressionHeader = 'gzip';
-    compressionName = 'GZIP';
-  } else if (userChoice === 'max') {
-    compressionHeader = 'gzip';
-    compressionName = 'GZIP (max)';
+      case 'minify_css':
+  // Remplacer le CSS par la version minifiée
+  console.log('🎨 Minification CSS appliquée');
+  // Chercher la balise style ou le fichier CSS
+  const cssRegex = /<style>([\s\S]*?)<\/style>/;
+  if (cssRegex.test(newContent)) {
+    newContent = newContent.replace(
+      cssRegex,
+      `<style>${modification.content}</style>`
+    );
+  } else {
+    // Chercher le lien CSS externe
+    const linkRegex = /<link rel="stylesheet" href="[^"]*\.css">/;
+    if (linkRegex.test(newContent)) {
+      // Remplacer par le CSS inline minifié
+      newContent = newContent.replace(
+        linkRegex,
+        `<style>${modification.content}</style>`
+      );
+    }
   }
-  
-  console.log(`✅ Compression ${compressionName} (${compressionHeader}) activée selon votre choix`);
-  
-  const vercelConfig = {
-    "headers": [
-      {
-        "source": "/(.*).css",
-        "headers": [
-          { "key": "Content-Encoding", "value": compressionHeader },
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      },
-      {
-        "source": "/(.*).js",
-        "headers": [
-          { "key": "Content-Encoding", "value": compressionHeader },
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      }
-    ]
-  };
-  
-  console.log(`📊 Type choisi: ${compressionName}`);
+  console.log('✅ CSS minifié appliqué');
+  break;
+
+case 'minify_js':
+  // Remplacer le JS par la version minifiée
+  console.log('📜 Minification JS appliquée');
+  const jsRegex = /<script>([\s\S]*?)<\/script>/;
+  if (jsRegex.test(newContent)) {
+    newContent = newContent.replace(
+      jsRegex,
+      `<script>${modification.content}</script>`
+    );
+  }
+  console.log('✅ JS minifié appliqué');
   break;
         
       default:
