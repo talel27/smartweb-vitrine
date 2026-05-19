@@ -241,7 +241,6 @@ module.exports = async (req, res) => {
 
       case 'add_internal_links':
         let linksHtml = modification.content;
-        // Format simplifié: /services,Nos services;/blog,Blog
         if (linksHtml.includes(',') && !linksHtml.includes('<a')) {
           const pairs = linksHtml.split(';');
           const links = [];
@@ -302,42 +301,39 @@ module.exports = async (req, res) => {
         console.log('✅ Lazy loading ajouté');
         break;
 
+      // ===== MINIFICATION CSS =====
       case 'minify_css':
-  // Remplacer le CSS par la version minifiée
-  console.log('🎨 Minification CSS appliquée');
-  // Chercher la balise style ou le fichier CSS
-  const cssRegex = /<style>([\s\S]*?)<\/style>/;
-  if (cssRegex.test(newContent)) {
-    newContent = newContent.replace(
-      cssRegex,
-      `<style>${modification.content}</style>`
-    );
-  } else {
-    // Chercher le lien CSS externe
-    const linkRegex = /<link rel="stylesheet" href="[^"]*\.css">/;
-    if (linkRegex.test(newContent)) {
-      // Remplacer par le CSS inline minifié
-      newContent = newContent.replace(
-        linkRegex,
-        `<style>${modification.content}</style>`
-      );
-    }
-  }
-  console.log('✅ CSS minifié appliqué');
-  break;
+        console.log('🎨 Minification CSS appliquée');
+        const cssStyleRegex = /<style>([\s\S]*?)<\/style>/;
+        if (cssStyleRegex.test(newContent)) {
+          newContent = newContent.replace(
+            cssStyleRegex,
+            `<style>${modification.content}</style>`
+          );
+        } else {
+          const linkRegex = /<link rel="stylesheet" href="[^"]*\.css">/;
+          if (linkRegex.test(newContent)) {
+            newContent = newContent.replace(
+              linkRegex,
+              `<style>${modification.content}</style>`
+            );
+          }
+        }
+        console.log('✅ CSS minifié appliqué');
+        break;
 
-case 'minify_js':
-  // Remplacer le JS par la version minifiée
-  console.log('📜 Minification JS appliquée');
-  const jsRegex = /<script>([\s\S]*?)<\/script>/;
-  if (jsRegex.test(newContent)) {
-    newContent = newContent.replace(
-      jsRegex,
-      `<script>${modification.content}</script>`
-    );
-  }
-  console.log('✅ JS minifié appliqué');
-  break;
+      // ===== MINIFICATION JS =====
+      case 'minify_js':
+        console.log('📜 Minification JS appliquée');
+        const jsScriptRegex = /<script>([\s\S]*?)<\/script>/;
+        if (jsScriptRegex.test(newContent)) {
+          newContent = newContent.replace(
+            jsScriptRegex,
+            `<script>${modification.content}</script>`
+          );
+        }
+        console.log('✅ JS minifié appliqué');
+        break;
         
       default:
         throw new Error(`Type de modification non supporté: ${modification.type}`);
