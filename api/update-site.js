@@ -74,7 +74,6 @@ module.exports = async (req, res) => {
     if (!branchExists) {
       console.log(`📁 Création de la branche ${featureBranch} à partir de ${mainBranch}...`);
       
-      // Récupérer le SHA du dernier commit de main
       const mainRefResponse = await fetch(
         `https://api.github.com/repos/${repo}/git/refs/heads/${mainBranch}`,
         {
@@ -93,7 +92,6 @@ module.exports = async (req, res) => {
       const mainSha = mainRef.object.sha;
       console.log(`📌 Dernier commit de main: ${mainSha.substring(0, 7)}`);
       
-      // Créer la nouvelle branche
       const createBranchResponse = await fetch(
         `https://api.github.com/repos/${repo}/git/refs`,
         {
@@ -135,7 +133,6 @@ module.exports = async (req, res) => {
     let currentContent, sha;
     
     if (getFileResponse.status === 404) {
-      // Le fichier n'existe pas sur la branche feature, on le prend de main
       console.log(`📄 ${filePath} n'existe pas sur ${featureBranch}, récupération depuis ${mainBranch}...`);
       
       const mainFileResponse = await fetch(
@@ -170,6 +167,7 @@ module.exports = async (req, res) => {
     let newContent = currentContent;
     
     switch(modification.type) {
+      
       case 'add_meta':
         const metaRegex = /<meta name="description" content="[^"]*"/;
         if (metaRegex.test(newContent)) {
@@ -215,6 +213,22 @@ module.exports = async (req, res) => {
         console.log('✅ H1 modifié/ajouté');
         break;
 
+      case 'add_h2':
+        const h2Regex = /<h2>.*?<\/h2>/;
+        if (h2Regex.test(newContent)) {
+          newContent = newContent.replace(
+            h2Regex,
+            `<h2>${modification.content}</h2>`
+          );
+        } else {
+          newContent = newContent.replace(
+            '</body>',
+            `    <h2>${modification.content}</h2>\n</body>`
+          );
+        }
+        console.log('✅ H2 ajouté/modifié');
+        break;
+
       case 'add_alt':
         const imgRegex = /<img (?!.*alt=)[^>]*>/g;
         let matchCount = 0;
@@ -225,21 +239,24 @@ module.exports = async (req, res) => {
         console.log(`✅ ALT ajouté à ${matchCount} image(s)`);
         break;
 
-      case 'add_schema':
-        const schemaContent = modification.content;
-        if (newContent.includes('<script type="application/ld+json">')) {
-          const schemaRegex = /<script type="application\/ld\+json">.*?<\/script>/s;
-          newContent = newContent.replace(
-            schemaRegex,
-            `<script type="application/ld+json">${schemaContent}</script>`
-          );
-        } else {
-          newContent = newContent.replace(
-            '</body>',
-            `  <script type="application/ld+json">${schemaContent}</script>\n</body>`
-          );
+      case 'add_internal_links':
+        let linksHtml = modification.content;
+        if (linksHtml.includes(',') && !linksHtml.includes('<a')) {
+          const pairs = linksHtml.split(';');
+          const links = [];
+          for (const pair of pairs) {
+            const [path, title] = pair.split(',');
+            if (path && title) {
+              links.push(`<a href="${path.trim()}">${title.trim()}</a>`);
+            }
+          }
+          linksHtml = links.join(' | ');
         }
-        console.log('✅ Données structurées ajoutées');
+        newContent = newContent.replace(
+          '</body>',
+          `    <div class="internal-links">${linksHtml}</div>\n</body>`
+        );
+        console.log('✅ Liens internes ajoutés');
         break;
 
       case 'add_lang':
@@ -262,6 +279,41 @@ module.exports = async (req, res) => {
         }
         break;
 
+      case 'add_schema':
+        const schemaContent = modification.content;
+        if (newContent.includes('<script type="application/ld+json">')) {
+          const schemaRegex = /<script type="application\/ld\+json">.*?<\/script>/s;
+          newContent = newContent.replace(
+            schemaRegex,
+            `<script type="application/ld+json">${schemaContent}</script>`
+          );
+        } else {
+          newContent = newContent.replace(
+            '</body>',
+            `  <script type="application/ld+json">${schemaContent}</script>\n</body>`
+          );
+        }
+        console.log('✅ Données structurées ajoutées');
+        break;
+
+      case 'add_lazy_loading':
+        newContent = newContent.replace(/<img /g, '<img loading="lazy" ');
+        console.log('✅ Lazy loading ajouté');
+        break;
+
+      // ===== MINIFICATION CSS =====
+      case 'minify_css':
+  console.log('🎨 Minification CSS - Remplacement du fichier entier');
+  newContent = modification.content;
+  console.log('✅ CSS minifié et sauvegardé (fichier entier remplacé)');
+  break;
+
+case 'minify_js':
+  console.log('📜 Minification JS - Remplacement du fichier entier');
+  newContent = modification.content;
+  console.log('✅ JS minifié et sauvegardé');
+  break;
+        
       default:
         throw new Error(`Type de modification non supporté: ${modification.type}`);
     }
@@ -301,7 +353,7 @@ module.exports = async (req, res) => {
     
     res.json({
       success: true,
-      message: `✅ Modification appliquée sur la branche **${featureBranch}** !\n\n🔗 Créez une Pull Request: ${prUrl}`,
+      message: `✅ ${modification.type} appliqué sur **${featureBranch}** !\n\n🔗 Pull Request: ${prUrl}`,
       modification: modification,
       file: filePath,
       branch: featureBranch,
